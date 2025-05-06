@@ -1,7 +1,5 @@
-export function helloAnything(thing: string): string {
-  return `Hello ${thing}!`;
-}
+import "./styles/index.css";
 
-// lib/main.ts
+export { Provider } from "./provider";
 export { Label } from "./components/label";
 export { Input } from "./components/input";
