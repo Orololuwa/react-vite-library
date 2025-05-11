@@ -73,10 +73,10 @@ export default defineConfig({
 ```json
 //package.json
 {
-  ...rest
+  ...,
     "scripts": {
     "build": "tsc --p ./tsconfig.build.json && vite build",
-    ...rest
+    ...
   },
 }
 ```
@@ -131,7 +131,7 @@ npm i @types/react @types/react-dom -D
 
 ```json
 {
-  ...rest,
+  ...,
   "include": ["src", "lib"]
 }
 ```
@@ -140,22 +140,143 @@ npm i @types/react @types/react-dom -D
 
 - Update `vite.config.ts`
 
-````typescript
+```typescript
 export default defineConfig({
-...rest,
+  ...,
   build: {
-    ...rest,
+    ...,
     rollupOptions: {
       external: ["react", "react/jsx-runtime"],
     },
   },
 });
+```
+
+6. **Configure Tailwind**
+
+- Install Tailwind and related packages
+
+```bash
+npm install -D tailwindcss@^3.3.0 autoprefixer@^10.4.0 postcss@^8.4.0
+```
+
+- Create a tailwind config file in the root of the project
+
+```typescript
+import type { Config } from "tailwindcss";
+
+export default {
+  content: ["./lib/**/*.{ts,tsx}"],
+  theme: {
+    extend: {
+      colors: {
+        primary: "#131316",
+        "primary-hover": "#333333",
+      },
+    },
+  },
+  plugins: [],
+} satisfies Config;
+```
+
+- Create a CSS file to be imported in the main.ts file
+
+```css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+- Update vite config to import autoprefixer and tailwindcss
+
+```typescript
+{
+  ...,
+    css: {
+    postcss: {
+      plugins: [
+        tailwindcss(),
+        autoprefixer(),
+      ],
+    },
+  },
+}
+```
+
+7. **Inject or Import CSS**
+
+- Now we have to import the CSS file and for that we need a library and update our vite.config.ts
+
+```bash
+npm i vite-plugin-lib-inject-css -D
+```
+
+```typescript
+import { libInjectCss } from 'vite-plugin-lib-inject-css'
+{
+  plugins: [
+    ...,
+    libInjectCss(),
+  ],
+  ...
+}
+```
+
+8. **Split Up CSS**
+
+But there's still the second problem: when you import something from your library, main.css is also imported and all the CSS styles end up in your application bundle. Even if you only import the button.
+
+The libInjectCSS plugin generates a separate CSS file for each chunk and includes an import statement at the beginning of each chunk's output file.
+
+So if you split up the JavaScript code, you end up having separate CSS files that only get imported when the according JavaScript files are imported.
+
+One way of doing this would be to turn every file into an Rollup entry point.
+
+- install glob
+
+```bash
+npm i glob -D
+```
+
+- update vite config
+
+```diff
+-import { resolve } from 'path'
++import { extname, relative, resolve } from 'path'
++import { fileURLToPath } from 'node:url'
++import { glob } from 'glob'
+
+...
+    rollupOptions: {
+      external: ['react', 'react/jsx-runtime'],
++     input: Object.fromEntries(
++       glob.sync('lib/**/*.{ts,tsx}', {
++         ignore: ["lib/**/*.d.ts"],
++       }).map(file => [
++         // The name of the entry point
++         // lib/nested/foo.ts becomes nested/foo
++         relative(
++           'lib',
++           file.slice(0, file.length - extname(file).length)
++         ),
++         // The absolute path to the entry file
++         // lib/nested/foo.ts becomes /project/lib/nested/foo.ts
++         fileURLToPath(new URL(file, import.meta.url))
++       ])
++     ),
++     output: {
++       assetFileNames: 'assets/[name][extname]',
++       entryFileNames: '[name].js',
++     }
+    }
+…
+```
 
 6. **Build Library**
 
 ```bash
 pnpm build
-````
+```
 
 5. **Test Locally**
 
